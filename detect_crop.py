@@ -200,7 +200,9 @@ def detect(save_img=False):
 
                     # Guardar imágenes recortadas después de aplicar filtro laplaciano
                     save_new_roi_path = str(cropped_dir / (p.stem + f'_{i}__cropped_new_roi.jpg'))
-                    cv2.imwrite(save_new_roi_path, new_roi)
+                    #cv2.imwrite(save_new_roi_path, new_roi)
+                    if new_roi is not None and not np.all(new_roi == 0):
+                        cv2.imwrite(save_new_roi_path, new_roi)
 
                     # Convertir la imagen de laplacian a un rango de 0 a 255
                     laplacian = cv2.convertScaleAbs(laplacian)
