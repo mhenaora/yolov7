@@ -1,5 +1,6 @@
 import argparse
 import time
+import numpy as np
 from pathlib import Path
 
 import cv2
@@ -14,6 +15,65 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
+def sort_vertices_clockwise_or_anticlockwise(vertices):
+    """
+    Ordenar los vértices en sentido horario o antihorario
+    """
+    # Calcular el centroide
+    cx = np.mean(vertices[:, 0])
+    cy = np.mean(vertices[:, 1])
+
+    # Ordenar los vértices según su ángulo con respecto al centroide
+    angles = np.arctan2(vertices[:, 1] - cy, vertices[:, 0] - cx)
+    sorted_indices = np.argsort(angles)
+
+    # Ordenar los vértices en sentido horario o antihorario según el signo del área del polígono
+    area = cv2.contourArea(vertices)
+    if area >= 0:
+        # Sentido horario
+        sorted_vertices = vertices[sorted_indices[::-1]]
+    else:
+        # Sentido antihorario
+        sorted_vertices = vertices[sorted_indices]
+
+    return sorted_vertices
+
+def get_perspective_transformed_image(image, vertices=None):
+    """
+    Obtener la transformación de perspectiva para recortar el documento.
+    Si los bordes principales no se detectan, utiliza el bounding box original con offset.
+    """
+    width = 200  # Ancho deseado del documento recortado
+    height = 300  # Alto deseado del documento recortado
+
+    if vertices is not None:
+        # Puntos de destino para la transformación de perspectiva
+        dst_points = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype=np.float32)
+
+        # Calcular la matriz de transformación
+        M = cv2.getPerspectiveTransform(vertices.astype(np.float32), dst_points)
+
+        # Realizar la transformación de perspectiva
+        warped_image = cv2.warpPerspective(image, M, (width, height))
+    else:
+        # Si no se detectaron bordes, utilizar el bounding box original con offset
+        offset = opt.offset  # Puedes ajustar el valor del offset según tus necesidades
+        x_min, y_min, x_max, y_max = offset, offset, image.shape[1] - offset, image.shape[0] - offset
+
+        # Puntos de destino para la transformación de perspectiva
+        dst_points = np.array([[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]], dtype=np.float32)
+
+        # Puntos de origen para la transformación de perspectiva utilizando el bounding box original con offset
+        src_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]], dtype=np.float32)
+
+        # Calcular la matriz de transformación
+        M = cv2.getPerspectiveTransform(src_points, dst_points)
+
+        # Realizar la transformación de perspectiva
+        warped_image = cv2.warpPerspective(image, M, (width, height))
+
+    return warped_image
+
 
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
@@ -24,6 +84,9 @@ def detect(save_img=False):
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+
+    cropped_dir = save_dir / 'cropped' # crop images dir
+    cropped_dir.mkdir(parents=True, exist_ok=True) 
 
     # Initialize
     set_logging()
@@ -111,13 +174,67 @@ def detect(save_img=False):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
-                # Print results
-                for c in det[:, -1].unique():
-                    n = (det[:, -1] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
-
-                # Write results
+                # Process each detection
                 for *xyxy, conf, cls in reversed(det):
+                    x_min, y_min, x_max, y_max = map(int, xyxy)
+
+                    # Aplicar offset hacia afuera del recorte del ROI
+                    offset = opt.offset  # value can be modified default 20
+                    x_min = max(0, x_min - offset)
+                    y_min = max(0, y_min - offset)
+                    x_max = min(im0.shape[1], x_max + offset)
+                    y_max = min(im0.shape[0], y_max + offset)
+
+                    # Recorte del bounding box
+                    roi = im0[y_min:y_max, x_min:x_max]
+
+                    # Aplicar filtro laplaciano
+                    laplacian = cv2.Laplacian(roi, cv2.CV_64F)
+
+                    # Recorte de la sección restante después de aplicar el filtro laplaciano
+                    new_roi = laplacian[y_min:y_max, x_min:x_max]
+
+                    # Guardar imágenes recortadas con filtro laplaciano
+                    save_laplacian_path = str(cropped_dir / (p.stem + f'_{i}_laplacian.jpg'))
+                    cv2.imwrite(save_laplacian_path, laplacian)
+
+                    # Guardar imágenes recortadas después de aplicar filtro laplaciano
+                    save_new_roi_path = str(cropped_dir / (p.stem + f'_{i}__cropped_new_roi.jpg'))
+                    cv2.imwrite(save_new_roi_path, new_roi)
+
+                    # Convertir la imagen filtrada (laplaciana) a escala de grises
+                    laplacian_gray = cv2.cvtColor(laplacian, cv2.COLOR_BGR2GRAY)
+
+                    # Aplicar un umbral binario para convertir los bordes resaltados en una imagen binaria
+                    _, binary_image = cv2.threshold(laplacian_gray, 50, 255, cv2.THRESH_BINARY)
+
+                    # Detectar los contornos en la imagen binaria
+                    contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                    # Identificar el contorno más grande, que debe corresponder al rectángulo del documento de identificación
+                    largest_contour = max(contours, key=cv2.contourArea)
+
+                    # Aproximar el contorno del rectángulo para obtener sus vértices
+                    epsilon = 0.1 * cv2.arcLength(largest_contour, True)
+                    approx_vertices = cv2.approxPolyDP(largest_contour, epsilon, True)
+
+                    # Si el documento es un rectángulo, approx_vertices debe contener cuatro vértices
+                    if len(approx_vertices) == 4:
+                        # Ordenar los vértices en sentido horario o antihorario
+                        sorted_vertices = sort_vertices_clockwise_or_anticlockwise(approx_vertices)
+
+                        # Obtener la transformación de perspectiva
+                        warped_image = get_perspective_transformed_image(roi, sorted_vertices)
+
+                    else: # Si no se detectan los bordes externos (suponiendo que son los que más sobresalen en el documento de identificación)
+                        # Obtener la transformación de perspectiva sin bordes detectados
+                        warped_image = get_perspective_transformed_image(roi)
+                    
+                    # Guardar la imagen recortada
+                    save_warped_path = str(cropped_dir / (p.stem + f'_{i}_warped.jpg'))
+                    cv2.imwrite(save_warped_path, warped_image)
+
+                    # Print results
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
@@ -127,6 +244,26 @@ def detect(save_img=False):
                     if save_img or view_img:  # Add bbox to image
                         label = f'{names[int(cls)]} {conf:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+
+                # # Rescale boxes from img_size to im0 size
+                # det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
+
+                # # Print results
+                # for c in det[:, -1].unique():
+                #     n = (det[:, -1] == c).sum()  # detections per class
+                #     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+
+                # # Write results
+                # for *xyxy, conf, cls in reversed(det):
+                #     if save_txt:  # Write to file
+                #         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                #         line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
+                #         with open(txt_path + '.txt', 'a') as f:
+                #             f.write(('%g ' * len(line)).rstrip() % line + '\n')
+
+                #     if save_img or view_img:  # Add bbox to image
+                #         label = f'{names[int(cls)]} {conf:.2f}'
+                #         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
@@ -183,6 +320,7 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
+    parser.add_argument('--offset', type=int, default=20, help='offset value in roi detected in bounding box (makes bbox bigger)')
     opt = parser.parse_args()
     print(opt)
     #check_requirements(exclude=('pycocotools', 'thop'))
