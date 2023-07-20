@@ -224,13 +224,13 @@ def detect(save_img=False):
                     else:
                         print("no edge detected using edge enhancer, image not saved")
 
-                    # Guardar imágenes recortadas después de aplicar filtro enhancero
-                    save_new_roi_path = str(cropped_dir / (p.stem + f'_{i}__cropped_new_roi.jpg'))
-                    #cv2.imwrite(save_new_roi_path, new_roi)
-                    if new_roi is not None and not np.all(new_roi == 0):
-                        cv2.imwrite(save_new_roi_path, new_roi)
-                    else:
-                        print("no crop roi, image not saved")
+                    # # Guardar imágenes recortadas después de aplicar filtro enhancero
+                    # save_new_roi_path = str(cropped_dir / (p.stem + f'_{i}__cropped_new_roi.jpg'))
+                    # #cv2.imwrite(save_new_roi_path, new_roi)
+                    # if new_roi is not None and not np.all(new_roi == 0):
+                    #     cv2.imwrite(save_new_roi_path, new_roi)
+                    # else:
+                    #     print("no crop roi, image not saved")
 
                     # # Considerar esta aplicación para futuros desarrollos para recorte de bordes de documento medinate extracción de bordes externos con computer vision tradicional    
 
@@ -261,7 +261,7 @@ def detect(save_img=False):
                     #     sorted_vertices = None  # Indicar que no hay vértices ordenados
 
                     # Obtener recorte del documento identificado sin bordes detectados
-                        warped_image = get_perspective_transformed_image(roi)
+                    warped_image = get_perspective_transformed_image(roi)
 
                     # Guardar la imagen recortada
                     save_warped_path = str(cropped_dir / (p.stem + f'_{i}_warped.jpg'))
