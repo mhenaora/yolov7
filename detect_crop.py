@@ -204,8 +204,6 @@ def detect(save_img=False):
                         sobel = np.sqrt(sobel_x**2 + sobel_y**2)
                         enhancer = np.uint8(sobel)
 
-                    # Convertir la imagen con el filtro de bordes de Sobel a escala de grises
-                        #enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
                         enhancer_gray = enhancer
                     else: #opt.edge_enhancer == 2 or others # Canny edge enhancer
                     
@@ -234,31 +232,36 @@ def detect(save_img=False):
                     else:
                         print("no crop roi, image not saved")
 
-                    # Aplicar un umbral binario para convertir los bordes resaltados en una imagen binaria
-                    _, binary_image = cv2.threshold(enhancer_gray, 50, 255, cv2.THRESH_BINARY)
+                    # # Considerar esta aplicación para futuros desarrollos para recorte de bordes de documento medinate extracción de bordes externos con computer vision tradicional    
 
-                    # Detectar los contornos en la imagen binaria
-                    contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    # # Aplicar un umbral binario para convertir los bordes resaltados en una imagen binaria
+                    # _, binary_image = cv2.threshold(enhancer_gray, 50, 255, cv2.THRESH_BINARY)
 
-                    # Identificar el contorno más grande, que debe corresponder al rectángulo del documento de identificación
-                    largest_contour = max(contours, key=cv2.contourArea)
+                    # # Detectar los contornos en la imagen binaria
+                    # contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-                    # Aproximar el contorno del rectángulo para obtener sus vértices
-                    epsilon = 0.1 * cv2.arcLength(largest_contour, True)
-                    approx_vertices = cv2.approxPolyDP(largest_contour, epsilon, True)
+                    # # Identificar el contorno más grande, que debe corresponder al rectángulo del documento de identificación
+                    # largest_contour = max(contours, key=cv2.contourArea)
 
-                    # Si el documento es un rectángulo, approx_vertices debe contener cuatro vértices
-                    if len(approx_vertices) == 4:
-                        # Ordenar los vértices en sentido horario o antihorario
-                        sorted_vertices = sort_vertices_clockwise_or_anticlockwise(approx_vertices)
+                    # # Aproximar el contorno del rectángulo para obtener sus vértices
+                    # epsilon = 0.1 * cv2.arcLength(largest_contour, True)
+                    # approx_vertices = cv2.approxPolyDP(largest_contour, epsilon, True)
 
-                        # Obtener la transformación de perspectiva
-                        warped_image = get_perspective_transformed_image(roi, sorted_vertices)
+                    # # Si el documento es un rectángulo, approx_vertices debe contener cuatro vértices
+                    # if len(approx_vertices) == 4:
+                    #     # Ordenar los vértices en sentido horario o antihorario
+                    #     sorted_vertices = sort_vertices_clockwise_or_anticlockwise(approx_vertices)
 
-                    else: # Si no se detectan los bordes externos (suponiendo que son los que más sobresalen en el documento de identificación)
-                        # Obtener la transformación de perspectiva sin bordes detectados
+                    #     # Obtener la transformación de perspectiva
+                    #     warped_image = get_perspective_transformed_image(roi, sorted_vertices)
+
+                    # else: # Si no se detectan los bordes externos (suponiendo que son los que más sobresalen en el documento de identificación)
+                    #     # Obtener la transformación de perspectiva sin bordes detectados
+                    #     warped_image = get_perspective_transformed_image(roi)
+                    #     sorted_vertices = None  # Indicar que no hay vértices ordenados
+
+                    # Obtener recorte del documento identificado sin bordes detectados
                         warped_image = get_perspective_transformed_image(roi)
-                        sorted_vertices = None  # Indicar que no hay vértices ordenados
 
                     # Guardar la imagen recortada
                     save_warped_path = str(cropped_dir / (p.stem + f'_{i}_warped.jpg'))
@@ -331,7 +334,7 @@ if __name__ == '__main__':
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
     parser.add_argument('--offset', type=int, default=20, help='offset value in roi detected in bounding box (makes bbox bigger)')
-    parser.add_argument('--edge-enhancer', type=int, default=0, help='edge-enhancer list laplacian (0) sobel (1) canny(2)')
+    parser.add_argument('--edge-enhancer', type=int, default=2, help='edge-enhancer list laplacian (0) sobel (1) canny(2)')
     opt = parser.parse_args()
     print(opt)
     #check_requirements(exclude=('pycocotools', 'thop'))
