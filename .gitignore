@@ -1,8 +1,8 @@
 # Repo-specific GitIgnore ----------------------------------------------------------------------------------------------
-*.jpg
-*.jpeg
-*.png
-*.bmp
+# *.jpg
+# *.jpeg
+# *.png
+# *.bmp
 *.tif
 *.tiff
 *.heic
@@ -29,7 +29,7 @@ storage.googleapis.com
 !runs/detect/id_detector_100_v6_05_065/*
 !runs/detect/id_detector_100_v2_03_065/*
 !runs/detect/id_detector_100_v2_05_065/*
-
+!runs/detect/id_detector_100_v2_05_065_crop/*
 !runs/train/id_detector_100_v6/*
 #!runs/train/id_detector_100_v6/weights/*.pt
 !runs/train/id_detector_100_v2/*
