@@ -194,7 +194,7 @@ def detect(save_img=False):
                         enhancer = cv2.convertScaleAbs(roi)
                     
                     # Convertir la imagen filtrada (mejora de bordes) a escala de grises
-                        #enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
+                        enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
 
                     elif opt.edge_enhancer == 1: #Sobel edge enhancer
                     
@@ -206,7 +206,7 @@ def detect(save_img=False):
 
                     # Convertir la imagen con el filtro de bordes de Sobel a escala de grises
                         #enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
-                        
+                        enhancer_gray = enhancer
                     else: #opt.edge_enhancer == 2 or others # Canny edge enhancer
                     
                     # Aplicar filtro de bordes de Canny en el canal verde de la imagen
@@ -214,10 +214,8 @@ def detect(save_img=False):
 
                     # Convertir la imagen con el filtro de bordes de Sobel a escala de grises
                         #enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
+                        enhancer_gray = enhancer
 
-                    # Convertir la imagen filtrada (mejora de bordes) a escala de grises
-                    enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
-                    
                     # Recorte de la sección restante después de aplicar el filtro de mejora de bordes
                     new_roi = enhancer[y_min:y_max, x_min:x_max]
 
@@ -260,7 +258,8 @@ def detect(save_img=False):
                     else: # Si no se detectan los bordes externos (suponiendo que son los que más sobresalen en el documento de identificación)
                         # Obtener la transformación de perspectiva sin bordes detectados
                         warped_image = get_perspective_transformed_image(roi)
-                    
+                        sorted_vertices = None  # Indicar que no hay vértices ordenados
+
                     # Guardar la imagen recortada
                     save_warped_path = str(cropped_dir / (p.stem + f'_{i}_warped.jpg'))
                     cv2.imwrite(save_warped_path, warped_image)
@@ -275,26 +274,6 @@ def detect(save_img=False):
                     if save_img or view_img:  # Add bbox to image
                         label = f'{names[int(cls)]} {conf:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
-
-                # # Rescale boxes from img_size to im0 size
-                # det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
-
-                # # Print results
-                # for c in det[:, -1].unique():
-                #     n = (det[:, -1] == c).sum()  # detections per class
-                #     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
-
-                # # Write results
-                # for *xyxy, conf, cls in reversed(det):
-                #     if save_txt:  # Write to file
-                #         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                #         line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
-                #         with open(txt_path + '.txt', 'a') as f:
-                #             f.write(('%g ' * len(line)).rstrip() % line + '\n')
-
-                #     if save_img or view_img:  # Add bbox to image
-                #         label = f'{names[int(cls)]} {conf:.2f}'
-                #         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
