@@ -188,30 +188,56 @@ def detect(save_img=False):
                     # Recorte del bounding box
                     roi = im0[y_min:y_max, x_min:x_max]
 
-                    # Aplicar filtro laplaciano
-                    laplacian = cv2.Laplacian(roi, cv2.CV_64F)
+                    if opt.edge_enhancer == 0: #Laplacian edge enhancer
 
-                    # Recorte de la sección restante después de aplicar el filtro laplaciano
-                    new_roi = laplacian[y_min:y_max, x_min:x_max]
+                    # Convertir la imagen de laplacian a un rango de 0 a 255
+                        enhancer = cv2.convertScaleAbs(roi)
+                    
+                    # Convertir la imagen filtrada (mejora de bordes) a escala de grises
+                        #enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
 
-                    # Guardar imágenes recortadas con filtro laplaciano
-                    save_laplacian_path = str(cropped_dir / (p.stem + f'_{i}_laplacian.jpg'))
-                    cv2.imwrite(save_laplacian_path, laplacian)
+                    elif opt.edge_enhancer == 1: #Sobel edge enhancer
+                    
+                    # Aplicar filtro de bordes de Sobel en el canal verde de la imagen
+                        sobel_x = cv2.Sobel(roi[:, :, 1], cv2.CV_64F, 1, 0, ksize=3)
+                        sobel_y = cv2.Sobel(roi[:, :, 1], cv2.CV_64F, 0, 1, ksize=3)
+                        sobel = np.sqrt(sobel_x**2 + sobel_y**2)
+                        enhancer = np.uint8(sobel)
 
-                    # Guardar imágenes recortadas después de aplicar filtro laplaciano
+                    # Convertir la imagen con el filtro de bordes de Sobel a escala de grises
+                        #enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
+                        
+                    else: #opt.edge_enhancer == 2 or others # Canny edge enhancer
+                    
+                    # Aplicar filtro de bordes de Canny en el canal verde de la imagen
+                        enhancer = cv2.Canny(roi[:, :, 1], threshold1=50, threshold2=150)
+
+                    # Convertir la imagen con el filtro de bordes de Sobel a escala de grises
+                        #enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
+
+                    # Convertir la imagen filtrada (mejora de bordes) a escala de grises
+                    enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
+                    
+                    # Recorte de la sección restante después de aplicar el filtro de mejora de bordes
+                    new_roi = enhancer[y_min:y_max, x_min:x_max]
+
+                    # Guardar imágenes recortadas con filtro enhancero
+                    save_enhancer_path = str(cropped_dir / (p.stem + f'_{i}_enhancer.jpg'))
+                    if enhancer is not None and not np.all(enhancer == 0):
+                        cv2.imwrite(save_enhancer_path, enhancer)
+                    else:
+                        print("no edge detected using edge enhancer, image not saved")
+
+                    # Guardar imágenes recortadas después de aplicar filtro enhancero
                     save_new_roi_path = str(cropped_dir / (p.stem + f'_{i}__cropped_new_roi.jpg'))
                     #cv2.imwrite(save_new_roi_path, new_roi)
                     if new_roi is not None and not np.all(new_roi == 0):
                         cv2.imwrite(save_new_roi_path, new_roi)
-
-                    # Convertir la imagen de laplacian a un rango de 0 a 255
-                    laplacian = cv2.convertScaleAbs(laplacian)
-                    
-                    # Convertir la imagen filtrada (laplaciana) a escala de grises
-                    laplacian_gray = cv2.cvtColor(laplacian, cv2.COLOR_BGR2GRAY)
+                    else:
+                        print("no crop roi, image not saved")
 
                     # Aplicar un umbral binario para convertir los bordes resaltados en una imagen binaria
-                    _, binary_image = cv2.threshold(laplacian_gray, 50, 255, cv2.THRESH_BINARY)
+                    _, binary_image = cv2.threshold(enhancer_gray, 50, 255, cv2.THRESH_BINARY)
 
                     # Detectar los contornos en la imagen binaria
                     contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -326,6 +352,7 @@ if __name__ == '__main__':
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
     parser.add_argument('--offset', type=int, default=20, help='offset value in roi detected in bounding box (makes bbox bigger)')
+    parser.add_argument('--edge-enhancer', type=int, default=0, help='edge-enhancer list laplacian (0) sobel (1) canny(2)')
     opt = parser.parse_args()
     print(opt)
     #check_requirements(exclude=('pycocotools', 'thop'))
