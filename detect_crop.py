@@ -202,6 +202,9 @@ def detect(save_img=False):
                     save_new_roi_path = str(cropped_dir / (p.stem + f'_{i}__cropped_new_roi.jpg'))
                     cv2.imwrite(save_new_roi_path, new_roi)
 
+                    # Convertir la imagen de laplacian a un rango de 0 a 255
+                    laplacian = cv2.convertScaleAbs(laplacian)
+                    
                     # Convertir la imagen filtrada (laplaciana) a escala de grises
                     laplacian_gray = cv2.cvtColor(laplacian, cv2.COLOR_BGR2GRAY)
 
