@@ -25,7 +25,20 @@
 
 
 storage.googleapis.com
-runs/*
+!runs/detect/id_detector_100_v6_03_065/*
+!runs/detect/id_detector_100_v6_05_065/*
+!runs/detect/id_detector_100_v2_03_065/*
+!runs/detect/id_detector_100_v2_05_065/*
+
+!runs/train/id_detector_100_v6/*
+#!runs/train/id_detector_100_v6/weights/*.pt
+!runs/train/id_detector_100_v2/*
+#!runs/train/id_detector_100_v2/weights/*.pt
+
+!runs/test/id_detector_100_v6_03_065/*
+!runs/test/id_detector_100_v6_05_065/*
+!runs/test/id_detector_100_v2_03_065/*
+!runs/test/id_detector_100_v2_05_065/*
 data/*
 data/images/*
 !data/*.yaml
@@ -56,7 +69,7 @@ val2017.zip
 
 # Neural Network weights -----------------------------------------------------------------------------------------------
 *.weights
-*.pt
+#*.pt
 *.pb
 *.onnx
 *.engine
