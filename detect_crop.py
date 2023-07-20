@@ -16,27 +16,27 @@ from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
 def sort_vertices_clockwise_or_anticlockwise(vertices):
-    """
-    Ordenar los vértices en sentido horario o antihorario
-    """
-    # Calcular el centroide
-    cx = np.mean(vertices[:, 0])
-    cy = np.mean(vertices[:, 1])
+    # Check if there are any vertices
+    if len(vertices) == 0:
+        return vertices
 
-    # Ordenar los vértices según su ángulo con respecto al centroide
-    angles = np.arctan2(vertices[:, 1] - cy, vertices[:, 0] - cx)
-    sorted_indices = np.argsort(angles)
-
-    # Ordenar los vértices en sentido horario o antihorario según el signo del área del polígono
-    area = cv2.contourArea(vertices)
-    if area >= 0:
-        # Sentido horario
-        sorted_vertices = vertices[sorted_indices[::-1]]
+    # Calculate the center of the vertices (assuming the points are in (x, y) format)
+    if len(vertices) >= 2:
+        cx = np.mean(vertices[:, 0])
+        cy = np.mean(vertices[:, 1])
     else:
-        # Sentido antihorario
-        sorted_vertices = vertices[sorted_indices]
+        # If there are not enough points, return the original vertices without sorting
+        return vertices
+
+    # Calculate the angle between each vertex and the center point
+    angles = np.arctan2(vertices[:, 1] - cy, vertices[:, 0] - cx)
+
+    # Sort the vertices based on the angles
+    sorted_indices = np.argsort(angles)
+    sorted_vertices = vertices[sorted_indices]
 
     return sorted_vertices
+
 
 def get_perspective_transformed_image(image, vertices=None):
     """
