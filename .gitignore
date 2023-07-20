@@ -23,6 +23,7 @@
 !setup.cfg
 !cfg/yolov3*.cfg
 
+
 storage.googleapis.com
 runs/*
 data/*
@@ -34,7 +35,7 @@ data/images/*
 !data/images/zidane.jpg
 !data/images/bus.jpg
 !data/*.sh
-
+!workspace/Kaggle/kaggle.json
 results*.csv
 
 # Datasets -------------------------------------------------------------------------------------------------------------
