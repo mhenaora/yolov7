@@ -37,7 +37,6 @@ def sort_vertices_clockwise_or_anticlockwise(vertices):
 
     return sorted_vertices
 
-
 def get_perspective_transformed_image(image, vertices=None):
     """
     Obtener la transformación de perspectiva para recortar el documento.
@@ -74,7 +73,6 @@ def get_perspective_transformed_image(image, vertices=None):
 
     return warped_image
 
-
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
@@ -86,7 +84,7 @@ def detect(save_img=False):
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
     cropped_dir = save_dir / 'cropped' # crop images dir
-    cropped_dir.mkdir(parents=True, exist_ok=True) 
+    cropped_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize
     set_logging()
@@ -130,7 +128,12 @@ def detect(save_img=False):
     old_img_b = 1
 
     t0 = time.time()
+    iteration = 0  # Variable para almacenar el número de iteración actual
     for path, img, im0s, vid_cap in dataset:
+        # Crear un subdirectorio para cada iteración (si no existe)
+        save_dir_iteration = save_dir / f'iteration_{iteration}'
+        save_dir_iteration.mkdir(parents=True, exist_ok=True)
+
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -188,84 +191,32 @@ def detect(save_img=False):
                     # Recorte del bounding box
                     roi = im0[y_min:y_max, x_min:x_max]
 
-                    if opt.edge_enhancer == 0: #Laplacian edge enhancer
+                    # Guardar la imagen original en el subdirectorio de iteración
+                    save_path_iteration = str(save_dir_iteration / p.name)  # img.jpg
+                    cv2.imwrite(save_path_iteration, im0)
 
-                    # Convertir la imagen de laplacian a un rango de 0 a 255
+                    # Guardar la imagen recortada en el subdirectorio de iteración
+                    save_cropped_path = str(save_dir_iteration / (p.stem + f'_{i}_cropped.jpg'))
+                    cv2.imwrite(save_cropped_path, roi)
+
+                    # Aplicar filtro de mejora de bordes
+                    if opt.edge_enhancer == 0:  # Laplacian edge enhancer
                         enhancer = cv2.convertScaleAbs(roi)
-                    
-                    # Convertir la imagen filtrada (mejora de bordes) a escala de grises
                         enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
-
-                    elif opt.edge_enhancer == 1: #Sobel edge enhancer
-                    
-                    # Aplicar filtro de bordes de Sobel en el canal verde de la imagen
+                    elif opt.edge_enhancer == 1:  # Sobel edge enhancer
                         sobel_x = cv2.Sobel(roi[:, :, 1], cv2.CV_64F, 1, 0, ksize=3)
                         sobel_y = cv2.Sobel(roi[:, :, 1], cv2.CV_64F, 0, 1, ksize=3)
                         sobel = np.sqrt(sobel_x**2 + sobel_y**2)
                         enhancer = np.uint8(sobel)
-
                         enhancer_gray = enhancer
-                    else: #opt.edge_enhancer == 2 or others # Canny edge enhancer
-                    
-                    # Aplicar filtro de bordes de Canny en el canal verde de la imagen
+                    else:  # opt.edge_enhancer == 2 or others (Canny edge enhancer)
                         enhancer = cv2.Canny(roi[:, :, 1], threshold1=50, threshold2=150)
-
-                    # Convertir la imagen con el filtro de bordes de Sobel a escala de grises
-                        #enhancer_gray = cv2.cvtColor(enhancer, cv2.COLOR_BGR2GRAY)
                         enhancer_gray = enhancer
 
-                    # Recorte de la sección restante después de aplicar el filtro de mejora de bordes
-                    new_roi = enhancer[y_min:y_max, x_min:x_max]
+                    # Guardar la imagen con el filtro de mejora de bordes en el subdirectorio de iteración
+                    save_enhancer_path = str(save_dir_iteration / (p.stem + f'_{i}_enhancer.jpg'))
+                    cv2.imwrite(save_enhancer_path, enhancer)
 
-                    # Guardar imágenes recortadas con filtro enhancero
-                    save_enhancer_path = str(cropped_dir / (p.stem + f'_{i}_enhancer.jpg'))
-                    if enhancer is not None and not np.all(enhancer == 0):
-                        cv2.imwrite(save_enhancer_path, enhancer)
-                    else:
-                        print("no edge detected using edge enhancer, image not saved")
-
-                    # # Guardar imágenes recortadas después de aplicar filtro enhancero
-                    # save_new_roi_path = str(cropped_dir / (p.stem + f'_{i}__cropped_new_roi.jpg'))
-                    # #cv2.imwrite(save_new_roi_path, new_roi)
-                    # if new_roi is not None and not np.all(new_roi == 0):
-                    #     cv2.imwrite(save_new_roi_path, new_roi)
-                    # else:
-                    #     print("no crop roi, image not saved")
-
-                    # # Considerar esta aplicación para futuros desarrollos para recorte de bordes de documento medinate extracción de bordes externos con computer vision tradicional    
-
-                    # # Aplicar un umbral binario para convertir los bordes resaltados en una imagen binaria
-                    # _, binary_image = cv2.threshold(enhancer_gray, 50, 255, cv2.THRESH_BINARY)
-
-                    # # Detectar los contornos en la imagen binaria
-                    # contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-                    # # Identificar el contorno más grande, que debe corresponder al rectángulo del documento de identificación
-                    # largest_contour = max(contours, key=cv2.contourArea)
-
-                    # # Aproximar el contorno del rectángulo para obtener sus vértices
-                    # epsilon = 0.1 * cv2.arcLength(largest_contour, True)
-                    # approx_vertices = cv2.approxPolyDP(largest_contour, epsilon, True)
-
-                    # # Si el documento es un rectángulo, approx_vertices debe contener cuatro vértices
-                    # if len(approx_vertices) == 4:
-                    #     # Ordenar los vértices en sentido horario o antihorario
-                    #     sorted_vertices = sort_vertices_clockwise_or_anticlockwise(approx_vertices)
-
-                    #     # Obtener la transformación de perspectiva
-                    #     warped_image = get_perspective_transformed_image(roi, sorted_vertices)
-
-                    # else: # Si no se detectan los bordes externos (suponiendo que son los que más sobresalen en el documento de identificación)
-                    #     # Obtener la transformación de perspectiva sin bordes detectados
-                    #     warped_image = get_perspective_transformed_image(roi)
-                    #     sorted_vertices = None  # Indicar que no hay vértices ordenados
-
-                    # Obtener recorte del documento identificado sin bordes detectados
-                    warped_image = get_perspective_transformed_image(roi)
-
-                    # Guardar la imagen recortada
-                    save_warped_path = str(cropped_dir / (p.stem + f'_{i}_warped.jpg'))
-                    cv2.imwrite(save_warped_path, warped_image)
 
                     # Print results
                     if save_txt:  # Write to file
@@ -278,13 +229,20 @@ def detect(save_img=False):
                         label = f'{names[int(cls)]} {conf:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
-            # Print time (inference + NMS)
-            print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
+                # Incrementar el número de iteración
+                iteration += 1
+
+            if save_txt or save_img:
+                s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ""
+                s += f"\n{iteration} iterations saved to {save_dir / 'cropped'}" if save_img else ""
+                print(s)
 
             # Stream results
             if view_img:
-                cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+                cv2.destroyAllWindows()
+
+            # Print time (inference + NMS)
+            print(f'{t2 - t1:.3f}ms | {t3 - t2:.3f}ms | {1.0 / (t2 - t1 + 1e-10):.1f}fps')  # 0.5 0.9 0.6fps
 
             # Save results (image with detections)
             if save_img:
